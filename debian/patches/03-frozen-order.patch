@@ -1,0 +1,14 @@
+Author: Max Alekseyev <relf@os2.ru>
+Description: Fix frozen order drives line totals crazy.
+
+diff -Naurp iftop.orig/ui.c iftop/ui.c
+--- iftop.orig/ui.c	2008-09-07 23:53:08.000000000 +0000
++++ iftop/ui.c	2009-01-24 22:57:57.000000000 +0000
+@@ -446,6 +446,7 @@ void screen_hash_clear() {
+     hash_node_type* n = NULL;
+     while(hash_next_item(screen_hash, &n) == HASH_STATUS_OK) {
+         host_pair_line* hpl = (host_pair_line*)n->rec;
++        hpl->total_recv = hpl->total_sent = 0;
+         memset(hpl->recv, 0, sizeof(hpl->recv));
+         memset(hpl->sent, 0, sizeof(hpl->sent));
+     }

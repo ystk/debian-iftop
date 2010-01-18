@@ -1,0 +1,19 @@
+Author: Joey Hess <joeyh@debian.org>
+Description: Fixes crash on arm.
+
+diff -Naurp iftop.orig/cfgfile.c iftop/cfgfile.c
+--- iftop.orig/cfgfile.c	2008-09-07 23:53:08.000000000 +0000
++++ iftop/cfgfile.c	2009-01-24 22:58:11.000000000 +0000
+@@ -45,9 +45,9 @@ stringmap config;
+ extern options_t options ;
+ 
+ int is_cfgdirective_valid(const char *s) {
+-    char **t;
+-    for (t = config_directives; *t != NULL; ++t)
+-        if (strcmp(s, *t) == 0) return 1;
++    int t;
++    for (t = 0; config_directives[t] != NULL; t++)
++       if (strcmp(s, config_directives[t]) == 0) return 1;
+     return 0;
+ }
+ 
