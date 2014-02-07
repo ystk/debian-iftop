@@ -25,7 +25,18 @@
 
 #define RESOLVE_QUEUE_LENGTH 20
 
-struct in_addr resolve_queue[RESOLVE_QUEUE_LENGTH];
+struct addr_storage {
+    int af;                     /* AF_INET or AF_INET6 */
+    int len;                    /* sizeof(struct in_addr or in6_addr) */
+    union {
+        struct in_addr  addr4;
+        struct in6_addr addr6;
+    } addr;
+#define as_addr4 addr.addr4
+#define as_addr6 addr.addr6
+};
+
+struct addr_storage resolve_queue[RESOLVE_QUEUE_LENGTH];
 
 pthread_cond_t resolver_queue_cond;
 pthread_mutex_t resolver_queue_mutex;
@@ -55,15 +66,34 @@ extern options_t options;
  * as NetBSD break the RFC and implement it in a non-thread-safe fashion, so
  * for the moment, the configure script won't try to use it.
  */
-char *do_resolve(struct in_addr *addr) {
-    struct sockaddr_in sin = {0};
+char *do_resolve(struct addr_storage *addr) {
+    struct sockaddr_in sin;
+    struct sockaddr_in6 sin6;
     char buf[NI_MAXHOST]; /* 1025 */
-    int res;
-    sin.sin_family = AF_INET;
-    sin.sin_addr = *addr;
-    sin.sin_port = 0;
+    int ret;
 
-    if (getnameinfo((struct sockaddr*)&sin, sizeof sin, buf, sizeof buf, NULL, 0, NI_NAMEREQD) == 0)
+    switch (addr->af) {
+        case AF_INET:
+            sin.sin_family = addr->af;
+            sin.sin_port = 0;
+            memcpy(&sin.sin_addr, &addr->as_addr4, addr->len);
+
+            ret = getnameinfo((struct sockaddr*)&sin, sizeof sin,
+                              buf, sizeof buf, NULL, 0, NI_NAMEREQD);
+            break;
+        case AF_INET6:
+            sin6.sin6_family = addr->af;
+            sin6.sin6_port = 0;
+            memcpy(&sin6.sin6_addr, &addr->as_addr6, addr->len);
+
+            ret = getnameinfo((struct sockaddr*)&sin6, sizeof sin6,
+                              buf, sizeof buf, NULL, 0, NI_NAMEREQD);
+	    break;
+        default:
+            return NULL;
+    }
+
+    if (ret == 0)
         return xstrdup(buf);
     else
         return NULL;
@@ -76,7 +106,7 @@ char *do_resolve(struct in_addr *addr) {
  * Some implementations of libc choose to implement gethostbyaddr_r as
  * a non thread-safe wrapper to gethostbyaddr.  An interesting choice...
  */
-char* do_resolve(struct in_addr * addr) {
+char* do_resolve(struct addr_storage *addr) {
     struct hostent hostbuf, *hp;
     size_t hstbuflen = 1024;
     char *tmphstbuf;
@@ -84,19 +114,19 @@ char* do_resolve(struct in_addr * addr) {
     int herr;
     char * ret = NULL;
 
-    /* Allocate buffer, remember to free it to avoid memory leakage.  */            
+    /* Allocate buffer, remember to free it to avoid memory leakage. */
     tmphstbuf = xmalloc (hstbuflen);
 
     /* Some machines have gethostbyaddr_r returning an integer error code; on
      * others, it returns a struct hostent*. */
 #ifdef GETHOSTBYADDR_R_RETURNS_INT
-    while ((res = gethostbyaddr_r((char*)addr, sizeof(struct in_addr), AF_INET,
+    while ((res = gethostbyaddr_r((char*)&addr->addr, addr->len, addr->af,
                                   &hostbuf, tmphstbuf, hstbuflen,
                                   &hp, &herr)) == ERANGE)
 #else
     /* ... also assume one fewer argument.... */
-    while ((hp = gethostbyaddr_r((char*)addr, sizeof(struct in_addr), AF_INET,
-                           &hostbuf, tmphstbuf, hstbuflen, &herr)) == NULL
+    while ((hp = gethostbyaddr_r((char*)&addr->addr, addr->len, addr->af,
+                                 &hostbuf, tmphstbuf, hstbuflen, &herr)) == NULL
             && errno == ERANGE)
 #endif
             {
@@ -125,12 +155,12 @@ char* do_resolve(struct in_addr * addr) {
  * Implementation using gethostbyname. Since this is nonreentrant, we have to
  * wrap it in a mutex, losing all benefit of multithreaded resolution.
  */
-char *do_resolve(struct in_addr *addr) {
+char *do_resolve(struct addr_storage *addr) {
     static pthread_mutex_t ghba_mtx = PTHREAD_MUTEX_INITIALIZER;
     char *s = NULL;
     struct hostent *he;
     pthread_mutex_lock(&ghba_mtx);
-    he = gethostbyaddr((char*)addr, sizeof *addr, AF_INET);
+    he = gethostbyaddr((char*)&addr->addr, addr->len, addr->af);
     if (he)
         s = xstrdup(he->h_name);
     pthread_mutex_unlock(&ghba_mtx);
@@ -147,14 +177,17 @@ char *do_resolve(struct in_addr *addr) {
  * libresolv implementation 
  * resolver functions may not be thread safe
  */
-char* do_resolve(struct in_addr * addr) {
+char* do_resolve(struct addr_storage *addr) {
   char msg[PACKETSZ];
   char s[35];
   int l;
   unsigned char* a;
   char * ret = NULL;
 
-  a = (unsigned char*)addr;
+  if (addr->af != AF_INET)
+    return NULL;
+
+  a = (unsigned char*)&addr->addr;
 
   snprintf(s, 35, "%d.%d.%d.%d.in-addr.arpa.",a[3], a[2], a[1], a[0]);
 
@@ -212,7 +245,7 @@ static void do_resolve_ares_callback(void *arg, int status, unsigned char *abuf,
     }
 }
 
-char *do_resolve(struct in_addr * addr) {
+char *do_resolve(struct addr_storage * addr) {
     struct ares_callback_comm C;
     char s[35];
     unsigned char *a;
@@ -220,6 +253,9 @@ char *do_resolve(struct in_addr * addr) {
     static pthread_mutex_t ares_init_mtx = PTHREAD_MUTEX_INITIALIZER;
     static pthread_key_t ares_key;
     static int gotkey;
+
+    if (addr->af != AF_INET)
+        return NULL;
 
     /* Make sure we have an ARES channel for this thread. */
     pthread_mutex_lock(&ares_init_mtx);
@@ -237,11 +273,11 @@ char *do_resolve(struct in_addr * addr) {
         if (ares_init(chan) != ARES_SUCCESS) return NULL;
     }
     
-    a = (unsigned char*)addr;
+    a = (unsigned char*)&addr->as_addr4;
     sprintf(s, "%d.%d.%d.%d.in-addr.arpa.", a[3], a[2], a[1], a[0]);
     
     C.result = 0;
-    C.addr = addr;
+    C.addr = &addr->as_addr4;
     ares_query(*chan, s, C_IN, T_PTR, do_resolve_ares_callback, &C);
     while (C.result == 0) {
         int n;
@@ -278,13 +314,13 @@ char *do_resolve(struct in_addr * addr) {
 
 int forking_resolver_worker(int fd) {
     while (1) {
-        struct in_addr a;
+        struct addr_storage a;
         struct hostent *he;
         char buf[NAMESIZE] = {0};
         if (read(fd, &a, sizeof a) != sizeof a)
             return -1;
 
-        he = gethostbyaddr((char*)&a, sizeof a, AF_INET);
+        he = gethostbyaddr((char*)&a.addr, a.len, a.af);
         if (he)
             strncpy(buf, he->h_name, NAMESIZE - 1);
 
@@ -293,7 +329,7 @@ int forking_resolver_worker(int fd) {
     }
 }
 
-char *do_resolve(struct in_addr *addr) {
+char *do_resolve(struct in6_addr *addr) {
     struct {
         int fd;
         pid_t child;
@@ -358,7 +394,7 @@ char *do_resolve(struct in_addr *addr) {
 
 #   warning No name resolution method specified; name resolution will not work
 
-char *do_resolve(struct in_addr *addr) {
+char *do_resolve(struct addr_storage *addr) {
     return NULL;
 }
 
@@ -376,7 +412,7 @@ void resolver_worker(void* ptr) {
         /* Keep resolving until the queue is empty */
         while(head != tail) {
             char * hostname;
-            struct in_addr addr = resolve_queue[tail];
+            struct addr_storage addr = resolve_queue[tail];
 
             /* mutex always locked at this point */
 
@@ -427,30 +463,47 @@ void resolver_initialise() {
 
 }
 
-void resolve(struct in_addr* addr, char* result, int buflen) {
+void resolve(int af, void* addr, char* result, int buflen) {
     char* hostname;
     union {
 	char **ch_pp;
 	void **void_pp;
     } u_hostname = { &hostname };
     int added = 0;
+    struct addr_storage *raddr;
 
     if(options.dnsresolution == 1) {
 
+        raddr = malloc(sizeof *raddr);
+        memset(raddr, 0, sizeof *raddr);
+        raddr->af = af;
+        raddr->len = (af == AF_INET ? sizeof(struct in_addr)
+                  : sizeof(struct in6_addr));
+        memcpy(&raddr->addr, addr, raddr->len);
+
         pthread_mutex_lock(&resolver_queue_mutex);
 
-        if(hash_find(ns_hash, addr, u_hostname.void_pp) == HASH_STATUS_OK) {
-            /* Found => already resolved, or on the queue */
+        if(hash_find(ns_hash, raddr, u_hostname.void_pp) == HASH_STATUS_OK) {
+            /* Found => already resolved, or on the queue, no need to keep
+	     * it around */
+            free(raddr);
         }
         else {
-            hostname = strdup(inet_ntoa(*addr));
-            hash_insert(ns_hash, addr, hostname);
+            hostname = xmalloc(INET6_ADDRSTRLEN);
+            inet_ntop(af, &raddr->addr, hostname, INET6_ADDRSTRLEN);
+
+            hash_insert(ns_hash, raddr, hostname);
 
             if(((head + 1) % RESOLVE_QUEUE_LENGTH) == tail) {
                 /* queue full */
             }
+            else if ((af == AF_INET6)
+                     && (IN6_IS_ADDR_LINKLOCAL(&raddr->as_addr6)
+                         || IN6_IS_ADDR_SITELOCAL(&raddr->as_addr6))) {
+                /* Link-local and site-local stay numerical. */
+            }
             else {
-                resolve_queue[head] = *addr;
+                resolve_queue[head] = *raddr;
                 head = (head + 1) % RESOLVE_QUEUE_LENGTH;
                 added = 1;
             }

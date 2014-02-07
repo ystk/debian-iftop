@@ -1,3 +1,98 @@
+iftop (1.0~pre2-4~deb7u2) stable; urgency=low
+
+  * Rebuild for Wheezy.
+  * Apply only the required changes to fix bug #677141, #726549 and
+    #693754. Revert commits b881f79, 66bb584.
+
+ -- Markus Koschany <apo@gambaru.de>  Wed, 30 Oct 2013 12:48:10 +0100
+
+iftop (1.0~pre2-4) unstable; urgency=low
+
+  * [488690e] New Maintainer. (Closes: #726549)
+  * [06096f6] Add memory-leak.patch.
+     - Fix a memory leak in resolver.c. The struct addr_storage was allocated
+       but never freed if dns resolution was turned off. Thanks to Olivier
+       Allard-Jacquin for the report and patch. (Closes: #677141)
+  * [ab3dd6a] Update VCS-fields.
+     - Move packaging to Git repository at collab-maint.
+  * [580ac7d] Require debhelper >= 9 for compat level 9. (Closes: #693754)
+  * [b881f79] Switch to source format 3.0 (quilt).
+  * [66bb584] Bump Standards-Version to 3.9.4, no changes.
+
+ -- Markus Koschany <apo@gambaru.de>  Sat, 19 Oct 2013 11:26:10 +0200
+
+iftop (1.0~pre2-3) unstable; urgency=low
+
+  * Enable hardening buildflags in debian/rules (Closes: #675849)
+
+ -- Alexander Reichle-Schmehl <tolimar@debian.org>  Tue, 22 May 2012 16:35:48 +0200
+
+iftop (1.0~pre2-2) unstable; urgency=low
+
+  * Bump standards to 3.9.3 (no changes needed)
+  * Upload to unstable
+
+ -- Alexander Reichle-Schmehl <tolimar@debian.org>  Tue, 22 May 2012 14:37:21 +0200
+
+iftop (0.17-19) unstable; urgency=low
+
+  * Add debian/patches/12-allow-iface-with-emtpy-mac.patch which fixes a
+    segfault when called upon interfaces with emtpy MAC address
+    (Closes: #609540)
+
+ -- Alexander Reichle-Schmehl <tolimar@debian.org>  Tue, 13 Dec 2011 16:05:19 +0100
+
+iftop (1.0~pre2-1) experimental; urgency=low
+
+  * New Upstream release
+    * Drop patches/01-manpage.patch (applied upstream)
+    * Drop patches/02-armeb.patch (applied upstream)
+    * Drop patches/03-frozen-order.patch (applied upstream)
+    * Drop patches/04-arm.patch (applied upstream)
+    * Drop patches/05-bar-display.patch (applied upstream)
+    * Drop patches/06-bar-bytes.patch (applied upstream)
+    * Drop patches/07-spelling-and-usage-text.patch (applied upstream)
+    * Drop patches/08-segfault-duplicate-options.patch (applied upstream)
+    * Drop patches/09-incomplete-hash-func.patch (applied upstream)
+    * Drop patches/10-lladdr-inclusion-kfreebsd.patch (applied upstream)
+    * Drop patches/11-implement-ipv6-support.patch (applied upstream)
+    * Fix package synopsis in --help (Closes: #439356)
+  * Deactivate quilt in debian/rules as no patches are left
+  * Fix usage of newer /usr/share/misc/config.{guess,sub} in debian/rules
+    (Closes: #535735)
+
+ -- Alexander Reichle-Schmehl <tolimar@debian.org>  Mon, 17 Oct 2011 16:05:33 +0200
+
+iftop (0.17-18) unstable; urgency=low
+
+  * Sepperate the changes from the previous upload into sepperate patches
+    * debian/patches/07-spelling-and-usage-text.patch
+    * debian/patches/08-segfault-duplicate-options.patch
+    * debian/patches/09-incomplete-hash-func.patch
+    * debian/patches/10-lladdr-inclusion-kfreebsd.patch
+    * debian/patches/11-implement-ipv6-support.patch
+  * Thanks again to Mats Erik Andersson for the work!
+  * Deactivate the (unexpected) subshell feature by building with
+    -DNO_SYSTEM
+  * Fix Vcs-Svn header in debian/control
+  * Fix typo of "feauture" in debian/NEWS
+  * Bump standards (No changes needed)
+
+ -- Alexander Reichle-Schmehl <tolimar@debian.org>  Mon, 17 Oct 2011 12:59:13 +0200
+
+iftop (0.17-17) experimental; urgency=low
+
+  * Use versioned build depends on quilt to allow easy backporting
+  * Add IPv6 support (Closes: #427852)
+  * Fix segfault when using the same command line argument multiple time
+    (Closes: #425488)
+  * Fix typo in display (Closes: #477928)
+  * Use better hash Algorithm in address pairs (Closes: #595169)
+  * Fix link-level address detection on kfreebsd-* (Closes: #598367)
+  * Many thanks for Mats Erik Andersson for working on these issues!
+
+ -- Alexander Reichle-Schmehl <tolimar@debian.org>  Fri, 15 Oct 2010 11:30:59 +0200
+
 iftop (0.17-16) unstable; urgency=low
 
   * Adopt package (Closes: #543874)

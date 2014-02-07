@@ -11,6 +11,7 @@
 /* 40 / 2  */
 #define HISTORY_LENGTH  20
 #define RESOLUTION 2
+#define DUMP_RESOLUTION 300
 
 typedef struct {
     long recv[HISTORY_LENGTH];
@@ -28,12 +29,20 @@ void *xrealloc(void *w, size_t n);
 char *xstrdup(const char *s);
 void xfree(void *v);
 
-/* ui.c */
-void analyse_data(void);
-void ui_init(void);
-
 /* options.c */
 void options_read(int argc, char **argv);
 
+struct pfloghdr {
+      unsigned char		length;
+      unsigned char		af;
+      unsigned char		action;
+      unsigned char		reason;
+      char				ifname[16];
+      char				ruleset[16];
+      unsigned int		rulenr;
+      unsigned int		subrulenr;
+      unsigned char		dir;
+      unsigned char		pad[3];
+};
 
 #endif /* __IFTOP_H_ */

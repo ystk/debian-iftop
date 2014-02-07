@@ -1,12 +1,12 @@
 Source: iftop
 Section: net
 Priority: optional
-Maintainer: Alexander Reichle-Schmehl <tolimar@debian.org>
-Build-Depends: debhelper (>= 7.0.50~), quilt, autotools-dev, libncurses5-dev, libpcap0.8-dev
-Standards-Version: 3.8.3
+Maintainer: Markus Koschany <apo@gambaru.de>
+Build-Depends: debhelper (>= 9), autotools-dev, libncurses5-dev, libpcap0.8-dev
+Standards-Version: 3.9.3
 Homepage: http://www.ex-parrot.com/~pdw/iftop/
-Vcs-Svn: svn://svn.debian.org/collab-maint/deb-maint/iftop/trunk/
-Vcs-Browser: http://svn.debian.org/viewsvn/collab-maint/deb-maint/iftop/
+Vcs-Git: git://anonscm.debian.org/collab-maint/iftop.git
+Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/iftop.git
 
 Package: iftop
 Architecture: any
