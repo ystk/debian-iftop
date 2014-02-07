@@ -38,7 +38,7 @@
 " s - toggle show source host            h - toggle this help display\n"\
 " d - toggle show destination host       b - toggle bar graph display\n"\
 " t - cycle line display mode            B - cycle bar graph average\n"\
-"                                        T - toggle cummulative line totals\n"\
+"                                        T - toggle cumulative line totals\n"\
 "Port display:                           j/k - scroll display\n"\
 " N - toggle service resolution          f - edit filter code\n"\
 " S - toggle show source port            l - set screen filter\n"\
@@ -58,8 +58,8 @@
 int history_divs[HISTORY_DIVISIONS] = {1, 5, 20};
 
 #define UNIT_DIVISIONS 4
-char* unit_bits[UNIT_DIVISIONS] =  { "b", "Kb", "Mb", "Gb"};
-char* unit_bytes[UNIT_DIVISIONS] =  { "B", "KB", "MB", "GB"};
+char* unit_bits[UNIT_DIVISIONS] =  { "b", "kb", "Mb", "Gb"};
+char* unit_bytes[UNIT_DIVISIONS] =  { "B", "kB", "MB", "GB"};
 
 typedef struct host_pair_line_tag {
     addr_pair ap;
@@ -97,10 +97,30 @@ int dontshowdisplay = 0;
  */
 int screen_line_bandwidth_compare(host_pair_line* aa, host_pair_line* bb, int start_div) {
     int i;
-    for(i = start_div; i < HISTORY_DIVISIONS; i++) {
-        if(aa->recv[i] + aa->sent[i] != bb->recv[i] + bb->sent[i]) {
-            return(aa->recv[i] + aa->sent[i] < bb->recv[i] + bb->sent[i]);
+    switch(options.linedisplay) {
+      case OPTION_LINEDISPLAY_ONE_LINE_SENT:
+	for(i = start_div; i < HISTORY_DIVISIONS; i++) {
+	    if(aa->sent[i] != bb->sent[i]) {
+	        return(aa->sent[i] < bb->sent[i]);
+	    }
         }
+        break;
+      case OPTION_LINEDISPLAY_ONE_LINE_RECV:
+	for(i = start_div; i < HISTORY_DIVISIONS; i++) {
+	    if(aa->recv[i] != bb->recv[i]) {
+	        return(aa->recv[i] < bb->recv[i]);
+	    }
+        }
+        break;
+      case OPTION_LINEDISPLAY_TWO_LINE:
+      case OPTION_LINEDISPLAY_ONE_LINE_BOTH:
+        /* fallback to the combined sent+recv that also act as fallback for sent/recv */
+	break;
+    }
+    for(i = start_div; i < HISTORY_DIVISIONS; i++) {
+	if(aa->recv[i] + aa->sent[i] != bb->recv[i] + bb->sent[i]) {
+	    return(aa->recv[i] + aa->sent[i] < bb->recv[i] + bb->sent[i]);
+	}
     }
     return 1;
 }
@@ -109,19 +129,19 @@ int screen_line_bandwidth_compare(host_pair_line* aa, host_pair_line* bb, int st
  * Compare two screen lines based on hostname / IP.  Fall over to compare by
  * bandwidth.
  */
-int screen_line_host_compare(struct in_addr* a, struct in_addr* b, host_pair_line* aa, host_pair_line* bb) {
+int screen_line_host_compare(void* a, void* b, host_pair_line* aa, host_pair_line* bb) {
     char hosta[HOSTNAME_LENGTH], hostb[HOSTNAME_LENGTH];
     int r;
 
     /* This isn't overly efficient because we resolve again before 
        display. */
     if (options.dnsresolution) {
-        resolve(a, hosta, HOSTNAME_LENGTH);
-        resolve(b, hostb, HOSTNAME_LENGTH);
+        resolve(aa->ap.af, a, hosta, HOSTNAME_LENGTH);
+        resolve(bb->ap.af, b, hostb, HOSTNAME_LENGTH);
     }
     else {
-        strcpy(hosta, inet_ntoa(*a));
-        strcpy(hostb, inet_ntoa(*b));
+        inet_ntop(aa->ap.af, a, hosta, sizeof(hosta));
+        inet_ntop(bb->ap.af, b, hostb, sizeof(hostb));
     }
 
     r = strcmp(hosta, hostb);
@@ -149,10 +169,10 @@ int screen_line_compare(void* a, void* b) {
       return screen_line_bandwidth_compare(aa, bb, 2);
     }
     else if(options.sort == OPTION_SORT_SRC) {
-      return screen_line_host_compare(&(aa->ap.src), &(bb->ap.src), aa, bb);
+      return screen_line_host_compare(&(aa->ap.src6), &(bb->ap.src6), aa, bb);
     }
     else if(options.sort == OPTION_SORT_DEST) {
-      return screen_line_host_compare(&(aa->ap.dst), &(bb->ap.dst), aa, bb);
+      return screen_line_host_compare(&(aa->ap.dst6), &(bb->ap.dst6), aa, bb);
     }
 
     return 1;
@@ -201,6 +221,8 @@ static struct {
     };
 static int rateidx = 0, wantbiggerrate;
 
+static int rateidx_init = 0;
+
 static int get_bar_interval(float bandwidth) {
     int i = 10;
     if(bandwidth > 100000000) {
@@ -225,8 +247,14 @@ static int get_bar_length(const int rate) {
     float l;
     if (rate <= 0)
         return 0;
-    if (rate > scale[rateidx].max)
-        wantbiggerrate = 1;
+    if (rate > scale[rateidx].max) {
+      wantbiggerrate = 1;
+      if(! rateidx_init) {
+	while(rate > scale[rateidx_init++].max) {
+	}
+	rateidx = rateidx_init;
+      }
+    }
     if(options.log_scale) {
         l = log(rate) / log(get_max_bandwidth());
     }
@@ -263,7 +291,7 @@ static void draw_bar_scale(int* y) {
             char s[40], *p;
             int x;
             /* This 1024 vs 1000 stuff is just plain evil */
-            readable_size(i, s, sizeof s, options.log_scale ? 1000 : 1024, 0);
+            readable_size(i, s, sizeof s, options.log_scale ? 1000 : 1024, options.bandwidth_in_bytes);
             p = s + strspn(s, " ");
             x = get_bar_length(i * 8);
             mvaddch(*y + 1, x, ACS_BTEE);
@@ -446,6 +474,7 @@ void screen_hash_clear() {
     hash_node_type* n = NULL;
     while(hash_next_item(screen_hash, &n) == HASH_STATUS_OK) {
         host_pair_line* hpl = (host_pair_line*)n->rec;
+        hpl->total_recv = hpl->total_sent = 0;
         memset(hpl->recv, 0, sizeof(hpl->recv));
         memset(hpl->sent, 0, sizeof(hpl->sent));
     }
@@ -486,10 +515,10 @@ void analyse_data() {
 
         /* Aggregate hosts, if required */
         if(options.aggregate_src) {
-            ap.src.s_addr = 0;
+            memset(&ap.src6, '\0', sizeof(ap.src6));
         }
         if(options.aggregate_dest) {
-            ap.dst.s_addr = 0;
+            memset(&ap.dst6, '\0', sizeof(ap.dst6));
         }
 
         /* Aggregate ports, if required */
@@ -534,7 +563,7 @@ void analyse_data() {
 
 }
 
-void sprint_host(char * line, struct in_addr* addr, unsigned int port, unsigned int protocol, int L) {
+void sprint_host(char * line, int af, struct in6_addr* addr, unsigned int port, unsigned int protocol, int L) {
     char hostname[HOSTNAME_LENGTH];
     char service[HOSTNAME_LENGTH];
     char* s_name;
@@ -545,14 +574,15 @@ void sprint_host(char * line, struct in_addr* addr, unsigned int port, unsigned 
 
     ip_service skey;
     int left;
-    if(addr->s_addr == 0) {
+
+    if(IN6_IS_ADDR_UNSPECIFIED(addr)) {
         sprintf(hostname, " * ");
     }
     else {
         if (options.dnsresolution)
-            resolve(addr, hostname, L);
+            resolve(af, addr, hostname, L);
         else
-            strcpy(hostname, inet_ntoa(*addr));
+            inet_ntop(af, addr, hostname, sizeof(hostname));
     }
     left = strlen(hostname);
 
@@ -636,8 +666,15 @@ void ui_print() {
                     L = HOSTNAME_LENGTH;
                 }
 
-                sprint_host(host1, &(screen_line->ap.src), screen_line->ap.src_port, screen_line->ap.protocol, L);
-                sprint_host(host2, &(screen_line->ap.dst), screen_line->ap.dst_port, screen_line->ap.protocol, L);
+                sprint_host(host1, screen_line->ap.af,
+                            &(screen_line->ap.src6),
+                            screen_line->ap.src_port,
+                            screen_line->ap.protocol, L);
+                sprint_host(host2, screen_line->ap.af,
+                            &(screen_line->ap.dst6),
+                            screen_line->ap.dst_port,
+                            screen_line->ap.protocol, L);
+
                 if(!screen_filter_match(host1) && !screen_filter_match(host2)) {
                   continue;
                 }
@@ -693,7 +730,7 @@ void ui_print() {
     mvaddstr(y+2, 0, "TOTAL: ");
 
     /* Cummulative totals */
-    mvaddstr(y, 16, "cumm: ");
+    mvaddstr(y, 16, "cum: ");
 
     readable_size(history_totals.total_sent, line, 10, 1024, 1);
     mvaddstr(y, 22, line);
@@ -733,8 +770,8 @@ void ui_print() {
 
     /* Bar chart auto scale */
     if (wantbiggerrate && options.max_bandwidth == 0) {
-        ++rateidx;
-        wantbiggerrate = 0;
+      ++rateidx;
+      wantbiggerrate = 0;
     }
 }
 
@@ -1045,7 +1082,7 @@ void ui_loop() {
                 break;
             }
             case '!': {
-#ifndef NO_SYSTEM
+#ifdef ALLOW_SUBSHELL
                 char *s;
                 dontshowdisplay = 1;
                 if ((s = edline(0, "Command", "")) && s[strspn(s, " \t")]) {
@@ -1082,10 +1119,10 @@ void ui_loop() {
             case 'T':
                 options.show_totals = !options.show_totals;
                 if(options.show_totals) {
-                    showhelp("Show cummulative totals");
+                    showhelp("Show cumulative totals");
                 }
                 else {
-                    showhelp("Hide cummulative totals");
+                    showhelp("Hide cumulative totals");
                 }
                 ui_print();
                 break;
