@@ -56,6 +56,9 @@ typedef struct {
     int aggregate_dest;
     int paused;
     int showhelp;
+    int timed_output;
+    int no_curses;
+    int num_lines;
     int bandwidth_in_bytes;
     option_sort_t sort;
 
@@ -93,5 +96,7 @@ typedef struct {
 
 void options_set_defaults();
 void options_read(int argc, char **argv);
+void options_read_args(int argc, char **argv);
+void options_make();
 
 #endif /* __OPTIONS_H_ */

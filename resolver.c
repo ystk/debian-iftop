@@ -107,15 +107,19 @@ char *do_resolve(struct addr_storage *addr) {
  * a non thread-safe wrapper to gethostbyaddr.  An interesting choice...
  */
 char* do_resolve(struct addr_storage *addr) {
-    struct hostent hostbuf, *hp;
+    struct hostent hostbuf, *hp = NULL;
     size_t hstbuflen = 1024;
     char *tmphstbuf;
-    int res;
+    int res = 0;
     int herr;
     char * ret = NULL;
 
     /* Allocate buffer, remember to free it to avoid memory leakage. */
     tmphstbuf = xmalloc (hstbuflen);
+
+    /* nss-myhostname's gethostbyaddr_r() causes an assertion failure if an
+     * "invalid" (as in outside of IPv4 or IPv6) address family is passed */
+    if (addr->af == AF_INET || addr->af == AF_INET6) {
 
     /* Some machines have gethostbyaddr_r returning an integer error code; on
      * others, it returns a struct hostent*. */
@@ -135,6 +139,7 @@ char* do_resolve(struct addr_storage *addr) {
         hstbuflen *= 2;
         tmphstbuf = realloc (tmphstbuf, hstbuflen);
       }
+    }
 
     /*  Check for errors.  */
     if (res || hp == NULL) {
@@ -478,7 +483,7 @@ void resolve(int af, void* addr, char* result, int buflen) {
         memset(raddr, 0, sizeof *raddr);
         raddr->af = af;
         raddr->len = (af == AF_INET ? sizeof(struct in_addr)
-                  : sizeof(struct in6_addr));
+                      : sizeof(struct in6_addr));
         memcpy(&raddr->addr, addr, raddr->len);
 
         pthread_mutex_lock(&resolver_queue_mutex);

@@ -65,34 +65,43 @@ OOPPTTIIOONNSS
 
        --bb     Don't display bar graphs of traffic.
 
+       --mm _l_i_m_i_t
+              Set the upper limit for the bandwidth  scale.   Specified  as  a
+              number with a 'K', 'M' or 'G' suffix.
+
        --BB     Display bandwidth rates in bytes/sec rather than bits/sec.
 
        --ii _i_n_t_e_r_f_a_c_e
               Listen to packets on _i_n_t_e_r_f_a_c_e.
 
        --ff _f_i_l_t_e_r _c_o_d_e
-              Use _f_i_l_t_e_r _c_o_d_e to select the packets to count. Only IP  packets
-              are  ever counted, so the specified code is evaluated as ((_f_i_l_t_e_r
+              Use  _f_i_l_t_e_r _c_o_d_e to select the packets to count. Only IP packets
+              are ever counted, so the specified code is evaluated as  ((_f_i_l_t_e_r
               _c_o_d_e)) aanndd iipp.
 
        --FF _n_e_t/_m_a_s_k
-              Specifies an IPv4 network for traffic analysis.   If  specified,
-              iftop  will  only  include  packets  flowing in to or out of the
-              given network, and packet direction is  determined  relative  to
-              the  network  boundary,  rather  than to the interface.  You may
-              specify _m_a_s_k as a dotted quad, such as /255.255.255.0, or  as  a
-              single  number specifying the number of bits set in the netmask,
+              Specifies  an  IPv4 network for traffic analysis.  If specified,
+              iftop will only include packets flowing in  to  or  out  of  the
+              given  network,  and  packet direction is determined relative to
+              the network boundary, rather than to  the  interface.   You  may
+              specify  _m_a_s_k  as a dotted quad, such as /255.255.255.0, or as a
+              single number specifying the number of bits set in the  netmask,
               such as /24.
 
        --GG _n_e_t_6/_m_a_s_k_6
-              Specifies an IPv6 network for traffic  analysis.  The  value  of
-              _m_a_s_k_6  can be given as a prefix length or as a numerical address
+              Specifies  an  IPv6  network  for traffic analysis. The value of
+              _m_a_s_k_6 can be given as a prefix length or as a numerical  address
               string for more compound bitmasking.
 
        --cc _c_o_n_f_i_g _f_i_l_e
-              Specifies an alternate config file.   If  not  specified,  iftop
-              will  use  ~~//..iiffttoopprrcc if it exists.  See below for a description
+              Specifies  an  alternate  config  file.  If not specified, iftop
+              will use ~~//..iiffttoopprrcc if it exists.  See below for  a  description
               of config files
+
+       --tt _t_e_x_t _o_u_t_p_u_t _m_o_d_e
+              Use  text interface without ncurses and print the output to STD-
+              OUT.
+
 
 
 DDIISSPPLLAAYY
@@ -307,7 +316,7 @@ AAUUTTHHOORR
 
 
 VVEERRSSIIOONN
-       $Id: iftop.8,v 1.27 2010/11/27 11:06:12 pdw Exp $
+       $Id: iftop.8,v 1.31 2014/01/05 17:22:39 pdw Exp $
 
 
 CCOOPPYYIINNGG
@@ -323,7 +332,7 @@ CCOOPPYYIINNGG
 
        You should have received a copy of the GNU General Public License along
        with this program; if not, write to the Free Software Foundation, Inc.,
-       675 Mass Ave, Cambridge, MA 02139, USA.
+       51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
        (nlu+10
 
